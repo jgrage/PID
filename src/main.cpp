@@ -4,12 +4,17 @@
 #include <Arduino.h>
 
 #define CS_PIN 10
+#define P_PIN A0
+#define I_PIN A1
+#define D_PIN A2
+#define PWM_PIN 6
+
 #define ALPHA 0.22
 
-bool output_enable;
-double setpoint, temperature, output;
-char line_buffer[256];
 uint8_t P, I, D;
+double setpoint, temperature, output;
+
+char line_buffer[256];
 
 /* initialize thermocouple IC with hardware spi */
 MAX6675 tcouple(CS_PIN);
@@ -48,27 +53,48 @@ void setup()
   scpi_register_command(controller, SCPI_CL_CHILD, "ENABLE", 6, "ON", 2, enable);
   scpi_register_command(controller, SCPI_CL_CHILD, "DISABLE", 7, "OFF", 3, disable);
 
-  
-  
   Serial.begin(9600);
   
-  /* dummy conversion */
+  /* dummy conversions */
   tcouple.readTempC();
+  P = analogRead(P_PIN);
+  I = analogRead(I_PIN);
+  D = analogRead(D_PIN);
   delay(500);
   
   /* first reading for exponential smoothing */
   temperature = tcouple.readTempC();
   delay(500);
+  /* initialize PID */
+  setpoint = 0.0;
+  myPID.SetSampleTime(500);
+  myPID.SetMode(MANUAL);
 }
 
 /* loop forever */
 void loop()
 {
-  uint8_t read_length;
+  /* update PID coefficients */
+  P = map(analogRead(P_PIN), 0, 1023, 0, 10);
+  I = map(analogRead(I_PIN), 0, 1023, 0, 10);
+  D = map(analogRead(D_PIN), 0, 1023, 0, 10);
+  myPID.SetTunings(P, I, D);
+  
+  /* exponential smoothing of temperrature measurements */
   float reading = tcouple.readTempC();
   temperature = ALPHA * reading + (1.0 - ALPHA) * temperature;
   
-  read_length = Serial.readBytesUntil('\n', line_buffer, 256);  
+  /* update PID */
+  myPID.Compute();
+  if(myPID.GetMode() == AUTOMATIC){
+    analogWrite(PWM_PIN, output);
+  }
+  else{
+    analogWrite(PWM_PIN, 0);
+  }
+  
+  /* execute SCPI commands */
+  uint8_t read_length = Serial.readBytesUntil('\n', line_buffer, 256);  
   if(read_length > 0)
   {
     scpi_execute_command(&ctx, line_buffer, read_length);
@@ -80,7 +106,6 @@ void loop()
 scpi_error_t identify(struct scpi_parser_context* context, struct scpi_token* command)
 {
   scpi_free_tokens(command);
-
   Serial.println("OIC,Embedded SCPI Example,1,10");
   return SCPI_SUCCESS;
 }
@@ -174,7 +199,7 @@ scpi_error_t get_coefficients(struct scpi_parser_context* context, struct scpi_t
 scpi_error_t enable(struct scpi_parser_context* context, struct scpi_token* command)
 {
   scpi_free_tokens(command);
-  output_enable = true;
+  myPID.SetMode(AUTOMATIC);
   return SCPI_SUCCESS;
 }
 
@@ -182,7 +207,7 @@ scpi_error_t enable(struct scpi_parser_context* context, struct scpi_token* comm
 scpi_error_t disable(struct scpi_parser_context* context, struct scpi_token* command)
 {
   scpi_free_tokens(command);
-  output_enable = false;
+  myPID.SetMode(MANUAL);
   return SCPI_SUCCESS;
 }
 
