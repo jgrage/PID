@@ -20,7 +20,7 @@ char line_buffer[256];
 MAX6675 tcouple(CS_PIN);
 
 /* create PID controller with proportional on measurement mode */
-PID myPID(&temperature, &output, &setpoint, 2, 5, 1, P_ON_M, DIRECT); 
+PID myPID(&temperature, &output, &setpoint, 2, 5, 1, P_ON_M, DIRECT);
 
 /* declare scpi parser */
 struct scpi_parser_context ctx;
@@ -35,7 +35,7 @@ scpi_error_t get_setpoint(struct scpi_parser_context* context, struct scpi_token
 scpi_error_t enable(struct scpi_parser_context* context, struct scpi_token* command);
 scpi_error_t disable(struct scpi_parser_context* context, struct scpi_token* command);
 
-
+    
 void setup()
 {
   struct scpi_command* controller;
@@ -54,14 +54,14 @@ void setup()
   scpi_register_command(controller, SCPI_CL_CHILD, "DISABLE", 7, "OFF", 3, disable);
 
   Serial.begin(9600);
-  
+
   /* dummy conversions */
   tcouple.readTempC();
   P = analogRead(P_PIN);
   I = analogRead(I_PIN);
   D = analogRead(D_PIN);
   delay(500);
-  
+
   /* first reading for exponential smoothing */
   temperature = tcouple.readTempC();
   delay(500);
@@ -79,11 +79,11 @@ void loop()
   I = map(analogRead(I_PIN), 0, 1023, 0, 10);
   D = map(analogRead(D_PIN), 0, 1023, 0, 10);
   myPID.SetTunings(P, I, D);
-  
+
   /* exponential smoothing of temperrature measurements */
   float reading = tcouple.readTempC();
   temperature = ALPHA * reading + (1.0 - ALPHA) * temperature;
-  
+
   /* update PID */
   myPID.Compute();
   if(myPID.GetMode() == AUTOMATIC){
@@ -92,9 +92,9 @@ void loop()
   else{
     analogWrite(PWM_PIN, 0);
   }
-  
+
   /* execute SCPI commands */
-  uint8_t read_length = Serial.readBytesUntil('\n', line_buffer, 256);  
+  uint8_t read_length = Serial.readBytesUntil('\n', line_buffer, 256);
   if(read_length > 0)
   {
     scpi_execute_command(&ctx, line_buffer, read_length);
@@ -122,11 +122,11 @@ scpi_error_t set_setpoint(struct scpi_parser_context* context, struct scpi_token
 
   float value;
   output_numeric = scpi_parse_numeric(args->value, args->length, 0, 0, 0);
-  
+
   if(output_numeric.length == 0 || (output_numeric.length == 1 && output_numeric.unit[0] == 'C'))
   {
     value = output_numeric.value;
-  
+
     if(value < 0.0)
     {
       scpi_error error;
@@ -154,8 +154,8 @@ scpi_error_t set_setpoint(struct scpi_parser_context* context, struct scpi_token
       setpoint = value;
       return SCPI_SUCCESS;
     }
-  } 
-  
+  }
+
   else{
     scpi_error error;
     error.id = -200;
