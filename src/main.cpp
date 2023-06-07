@@ -1,3 +1,10 @@
+/*
+ * main.cpp
+ * 
+ * Copyright 2023 Jonas Grage <grage@physik.tu-berlin.de>
+ * SPDX-License-Identifier: MIT
+ */
+
 #include <MAX6675.h>
 #include <PID_v1.h>
 #include <scpiparser.h>
